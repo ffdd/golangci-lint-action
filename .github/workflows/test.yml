@@ -10,10 +10,14 @@ jobs:
   build: # make sure build/ci work properly
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - if: ${{ !(github.event_name == 'pull_request' && (github.event.pull_request.user.id == 49699333 || contains(github.event.pull_request.labels.*.name, 'dependencies'))) }}
+        uses: actions/checkout@v4
+      - if: github.event_name == 'pull_request' && (github.event.pull_request.user.id == 49699333 || contains(github.event.pull_request.labels.*.name, 'dependencies'))
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.ref }}
+
       - run: |
           npm install
           npm run all
@@ -48,20 +52,51 @@ jobs:
         version:
           - ""
           - "latest"
-          - "v1.37"
-          - "v1.37.1"
+          - "v1.53"
+          - "v1.53.2"
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          cache: false # setup-go v4 caches by default
       - uses: ./
         with:
           version: ${{ matrix.version }}
-          args: --timeout=3m --issues-exit-code=0 ./sample/...
+          args: --timeout=5m --issues-exit-code=0 ./sample/...
           only-new-issues: true
+
+  test-go-install: # make sure the action works on a clean machine without building (go-install mode)
+    needs: [ build ]
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        version:
+          - ""
+          - "latest"
+          - "v1.53.2"
+          - "b5093688c0d3008eaacd6066773a1a52e689252f"
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          cache: false # setup-go v4 caches by default
+      - uses: ./
+        with:
+          version: ${{ matrix.version }}
+          args: --timeout=5m --issues-exit-code=0 ./sample/...
+          only-new-issues: true
+          install-mode: goinstall
 
   test-go-mod-version:
     needs: [ build ]
@@ -75,9 +110,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          cache: false # setup-go v4 caches by default
       - uses: ./
         with:
           working-directory: sample-go-mod
-          args: --timeout=3m --issues-exit-code=0 ./...
+          args: --timeout=5m --issues-exit-code=0 ./...
